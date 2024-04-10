@@ -1,0 +1,116 @@
+# Title:      Graphics Code for simple Line and Point plots for SWPP 
+# Objective:  Graphs for hydro monitoring data
+# Created by: Jo Snoalv-Cunliffe
+# Created on: 2024-02-10
+
+#Set Working Directory
+setwd("C:/Users/Hp User...") # Add correct WD
+getwd() # Check WD
+
+# Install relevant packages
+install.packages(c("tidyverse", "lubridate"))
+
+##### 1A Read file and view data#######################################################################################################
+detailed<- read.csv(file.choose(), header=T, sep=",") #load data, choose .txt file 
+head(detailed) #check what you loaded, it is displayed in the R console
+attach(detailed)
+data.frame(detailed)
+View(detailed)
+dim(detailed) # Explore dimensions
+table(detailed['serial_number']) # Check all sensors are accounted for
+
+# for Detailed omit NA's
+detailed<- na.omit(detailed)
+View(detailed)
+
+
+##### 1A Read file and view data#######################################################################################################
+dailyaverage<- read.csv(file.choose(), header=T, sep=",") #load data, choose .txt file 
+# NOTE: When reading in the Daily .csv-file, please make sure you have already created
+# a colum "type" (with values either restoration/control) and 
+# a column "status" ( with values either pre/post)
+head(dailyaverage) #check what you loaded, it is displayed in the R console
+attach(dailyaverage)
+data.frame(dailyaverage)
+View(dailyaverage)
+dim(dailyaverage)
+table(dailyaverage['serial_number'])
+
+# Change date from format chr to date, using package 'lubridate', 
+#this works if date in .csv-file is YYYY-MM-DD (you will get NA's when using "str()" if this is not the case)
+library(lubridate)
+detailed$date <- ymd(detailed$date)
+str(detailed)
+
+dailyaverage$date <- ymd(dailyaverage$date)
+str(dailyaverage)
+
+# GRAPHICAL OUTPUT
+##### Install packages and display nice line and point graphs
+install.packages(c("ggplot2", "dplyr", "RColorBrewer", "ggpubr",
+                   "ggpubr","corrplot"))
+library(ggplot2)
+library(dplyr)
+library(RColorBrewer)
+library(tidyverse)
+library(ggpubr)
+library(corrplot)
+
+
+###################################################################################################
+### Plotting it - functional code
+
+#### Simple plot
+plot(mean.DTW_m.) #Simply get a quick overview in baseR
+
+# really simple plot 
+qplot(x=date, y=mean.DTW_m.,
+      data=detailed, na.rm=TRUE,
+      main="(Name appropriately, e.g. Sensor control NW (Prison Farm)",
+      xlab="Date", ylab="Water level (m)")
+
+
+##################################################################################################
+#Nice plot from Detailed and Daily .csv-files
+
+library(scales)
+
+# Graph 1 Facet grid, alla sensors in one plot, using Detailed data
+p<-ggplot(detailed, aes(x = date, y = DTW_m)) +
+  geom_hline(yintercept = 0, size = 0.5, colour = "gray20", linetype = "dotted") +
+  geom_line(aes(x = date, y = DTW_m, group = location, colour = as.factor(serial_number))) +
+  scale_colour_viridis_d()+
+  scale_y_reverse() + # y axis reversed to help with realistic visualisation of water depth!
+  facet_grid(vars(serial_number), scales = "free")+
+  labs(x = "Date Time", y = "DTW (m)", colour = "Serial Number") +
+  theme(legend.position = "top")+
+  scale_x_date(date_breaks = "months", date_labels = "%b-%y")+
+  labs(title="Ockerton Court: experimental data", subtitle="Detailed", 
+       x = "Date", y = "DTW (m)", colour = "Serial Number")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+p + theme_classic()
+
+
+# Graph 2 point gridded by type control or restored, 
+# using Daily data (Detailed makes the plot messy)
+p<-ggplot(dailyaverage, aes(x = date, y = mean.DTW_m.)) +
+  geom_hline(yintercept = 0, size = 0.5, colour = "gray20", linetype = "dotted") +
+  geom_point(aes(x = date, y = mean.DTW_m., group = type, colour = as.factor(serial_number))) +
+  #geom_hline(yintercept = mean(DTW_m), color="blue")+
+  scale_colour_viridis_d()+
+  scale_y_reverse() + # y axis reversed to help with realistic visualisation
+  #facet_grid(vars(serial_number), scales = "free")+
+  facet_grid(~type)+
+  labs(title="Ockerton Court: experiments", subtitle="Daily average", 
+       x = "Date", y = "DTW (m)", colour = "Sensor")+
+  theme(legend.position = "top")+
+  scale_x_date(date_breaks = "month", date_labels = "%b-%y")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+p + theme_minimal()
+
+# If you get this error:
+#
+# "Error in seq.int(r1$mon, 12 * (to0$year - r1$year) + to0$mon, by) : 
+#  'from' must be a finite number"
+#
+# One workaround is to change the format of Date column in .csv-file in Excel...!
