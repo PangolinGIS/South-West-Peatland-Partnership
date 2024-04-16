@@ -1,0 +1,48 @@
+# Title:      Interactive dygraph
+# Objective:  Interactive dygraph, SWPP hydro monitoring e.g. put on website
+# Created by: Jo Snoalv-Cunliffe
+# Created on: 2024-02-10
+
+#Set Working Directory
+setwd("C:/Users/Hp User/Documents/...") #set relevant working directory
+getwd() 
+
+# Install relevant packages
+install.packages(c("xts","dygraph"))
+
+##### Read file and view data ##################################################
+mydata<- read.csv(file.choose(), header=T, sep=",") #load data, 
+#choose .txt file, note this is for plotting one sensor at the time!
+head(mydata) #check what you loaded, it is displayed in the R console
+attach(mydata)
+data.frame(mydata)
+View(mydata)
+
+as_tibble(mydata) # create tibble
+mydata[mydata < 0] <- NA
+str(mydata)
+
+##### Use lubridate to transform date
+library(lubridate)        
+mydata$date <- ymd(mydata$date)
+str(mydata)
+
+################################### WORKING DYGRAPHS ############################
+# Libraries
+library(dygraphs)
+library(xts) # To make the conversion data-frame / xts format
+
+# Your time column MUST be a time format! Check it out with str()
+str(mydata)
+
+# Then you can create the xts format, and thus use dygraph
+plotdata <- xts(x = mydata$mean.DTW_m., order.by = mydata$date) 
+str(plotdata)
+# Make the chart, change titles to relevant inputs!
+p <- dygraph(plotdata, main = "Example Ockerton Court: Control A") %>%  
+  dyRangeSelector() %>%
+  dyAxis("y", label = "Water level depth (m)", valueRange = c(0.5, -0.1)) %>%
+  dyOptions(axisLineWidth = 1.5, fillGraph = TRUE, drawGrid = TRUE)
+p
+
+##################### END ########################################################
