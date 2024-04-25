@@ -1,0 +1,282 @@
+# Title:      Create boxplots (monthly) from time series hydrological data
+# Objective:  Boxplots & descriptive statistics (note somewhat untidy!)
+# Created by: Jo Snoalv-Cunliffe
+# Created on: 2024-03-07
+
+install.packages(c("rtools", "dplyr", "tidyverse", "forecast", "lubridate"))
+library(tidyverse)
+library(dplyr)
+library(forecast)
+library(lubridate)
+
+
+#Set Working Directory
+setwd("C:/Users/Hp User/Documents/SW qgis work/logger_data/Ockerton Court") #Change to your working directory
+getwd()
+
+####### Install packages
+#install.packages(c("dplyr", "forecast", "lubridate"))
+
+##### 1A Read file and view data#######################################################################################################
+ds1<- read.csv(file.choose(), header=T, sep=",") #load detailed data, choose .txt file 
+#with my-data; JS_groupNr_table_forRstudio"
+head(ds1) #check what you loaded, it is displayed in the R console
+attach(ds1)
+data.frame(ds1)
+View(ds1)
+dim(ds1)
+table(ds1['serial_number'])
+
+# Remove NAs
+ds1<- na.omit(ds1)
+View(ds1)
+
+######## Transform 'date' from 'Chr' to 'Date' in both ds1 and ds2 (otherwise aggregate function won't work)
+library(lubridate)
+ds1$date <- ymd(ds1$date)
+str(ds1)
+
+# Add new column with year_month character value
+ds2<- ds1 %>% 
+  mutate(year_month = as.POSIXct(ds1$date), year_month = format(date, "%Y-%m"))
+View(ds2)
+
+#Check data summary
+summary(DTW_m) 
+
+
+## Dr. Rob Hyndman suggested using Tukey's (Running Median) Smoothing (individual sensors only)
+## To check visaully for outliers
+y <- ts(na.omit(ds1$DTW_m))
+plot(y, type="b", 
+     ylim = rev(range(y)),
+     main="Sensor 921121",
+     xlab="Count",
+     ylab="Water level depth (m)",
+     sub="Tukey's (Running Median) Smoothing",
+     cex.main=1.5, cex.lab=1.2, cex.sub=1)
+smoothy <- smooth(y)
+lines(smoothy, col="red")
+
+y <- tsclean(na.omit(ds1$DTW_m))
+plot(y, type="b", 
+     ylim = rev(range(y)),
+     main="Sensor 921121",
+     xlab="Count",
+     ylab="Water level depth (m)",
+     sub="Tukey's (Running Median) Smoothing",
+     cex.main=1.5, cex.lab=1.2, cex.sub=1)
+smoothy <- smooth(y)
+lines(smoothy, col="red")
+
+
+
+
+############################### GRAPHICS ###############################
+# install the package 
+install.packages("ggstatsplot")
+# Load the package
+library(ggstatsplot)
+# Create a boxplot of the dataset, outliers are shown as two distinct points
+boxplot(ds1)$out
+#Create a boxplot that labels the outliers  
+ggbetweenstats(ds1,
+               DTW_m, breaks, outlier.tagging = TRUE)
+
+####### Perform test of normality (Kolmogorov-Smirnov test)
+ks.test(ds2$DTW_m, "pnorm")
+hist(ds2$DTW_m)
+
+#Produce QQ-plot
+qqnorm(ds2$DTW_m)
+qqline(ds2$DTW_m, color="red")
+
+hist(ds2$DTW_m, breaks=300, 
+     main="Histogram of sensor 921121",
+     #xlab="Count",
+     xlab="Water level depth (m)",
+     #sub="Tukey's (Running Median) Smoothing",
+     cex.main=1.5, cex.lab=1.2, cex.sub=1, xlim=c(-0.1,0.5))
+
+hist(tsclean(ds2$DTW_m), breaks=100, 
+     main="Histogram of sensor 921121",
+     #xlab="Count",
+     xlab="Water level depth (m)",
+     #sub="Tukey's (Running Median) Smoothing",
+     cex.main=1.5, cex.lab=1.2, cex.sub=1, xlim=c(-0.1,0.5))
+
+
+install.packages("ggplot2")
+install.packages("ggExtra")
+library(ggplot2)
+library(ggExtra)
+
+# Save the scatter plot in a variable
+p <- ggplot(ds2, aes(x = DTW_m, y = date)) +
+  geom_point()
+
+p <- ggplot(ds2, aes(x = tsclean(DTW_m), y = date)) +
+  geom_point(size=0.5)
+
+# Densigram
+ggMarginal(p, type = "densigram")
+ggMarginal(p, type = "histogram", 
+           margins = "x",  bins=100)
+
+hist(tsclean(ds2$DTW_m), breaks=100)
+
+
+
+
+##### 1B Install packages & display nice graphs ##############################
+#install.packages("ggplot2")
+install.packages("tidyverse")
+library(ggplot2)
+install.packages("dplyr")
+library(dplyr)
+install.packages("RColorBrewer")
+library(RColorBrewer)
+library(tidyverse)
+install.packages("ggpubr")
+library(ggpubr)
+install.packages("StatDA")
+library(StatDA)
+install.packages("FSA")
+library(FSA)
+
+
+
+########################## PRINT BOXPLOTS boxes for each month ###########################################
+library(tidyverse) # or `library(ggplot2); library(dplyr)` or use base to add the year beforehand
+bp <- ggplot(ds1%>% 
+               mutate(year = lubridate::year(date)), 
+                      month = lubridate::month(date, label = TRUE),
+             aes(x = date, y = DTW_m, 
+                 group = lubridate::floor_date(date, "month"),
+                 fill = as.factor(year), colour = as.factor(year))) +
+  geom_boxplot(alpha = 0.5,  outliers = FALSE) +
+  labs(x = "Date", y = "Water level depth (m)", color="Year", fill="Year") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  facet_wrap(serial_number)+
+  #facet_wrap(~year, nrow = 1, scales = "free_x")+
+  scale_y_reverse()+
+  geom_vline(xintercept = as.numeric(as.Date("2023-10-01")), linetype=4)+
+  geom_vline(xintercept = as.numeric(as.Date("2023-12-01")), linetype=4)+
+  # annotate("rect", xmin = as.Date("2023-10-01"),
+  #          xmax = as.Date("2023-12-01"), 
+  #          ymin = -2, ymax = inf,
+  #          alpha = 0.2)+
+  scale_colour_brewer(palette="Accent")+ 
+  scale_fill_brewer(palette="Paired")+
+  stat_summary(fun.y="mean", geom="point", size=0.5, ### adds 'mean' dots to the boxplot, almost like a scatterplot
+               position=position_dodge(width=0.75), color="red")
+bp+ theme_minimal()
+
+for (serial_number in unique(ds1$serial_number)) {
+  dev.new()
+  print( ggplot(ds1[ds1$serial_number==922303,], aes(Var1, Var2)) + geom_point() )
+}
+
+
+############# COMPARE each year
+# library(tidyverse); # or `library(ggplot2); library(dplyr)` or use base to add the year beforehand
+# ggplot(ds1 %>% mutate(year = lubridate::year(date)), 
+#        aes(x = date, y = DTW_m, 
+#            group = lubridate::floor_date(date, "month"))) +
+#   geom_boxplot(alpha = 0.5) +
+#   labs(x = "Collection Date", y = "PB(ug/L)") +
+#   scale_x_date(date_breaks = "1 month", date_labels =  "%b %Y") +
+#   theme(axis.text.x=element_text(angle=60, hjust=1)) +
+#   geom_hline(yintercept = 0, linetype=4)+
+#   facet_wrap(~year, nrow = 1, scales = "free_x")
+
+
+#### Compare different years - WORKING SCRIPT
+bp<-ggplot(ds2 %>% 
+             mutate(year = lubridate::year(date),
+                    month = lubridate::month(date, label = TRUE)), 
+           aes(x = as.factor(year), y = DTW_m, group = year,
+               fill = as.factor(year), colour = as.factor(year))) +
+  geom_boxplot(alpha = 0.5, outliers = FALSE) +
+  #theme(legend.position="none")+
+  scale_y_reverse()+
+  geom_hline(yintercept = 0, linetype=2, alpha=0.3)+
+  scale_colour_brewer(palette="Accent")+ 
+  scale_fill_brewer(palette="Paired")+
+  facet_wrap(serial_number)+
+  labs(x = "Date", y = "Water level depth (m)", color="Year", fill="Year") +
+  theme(axis.text.x=element_text(angle=60, hjust=1)) +
+  facet_wrap(~month, nrow = 1, scales = "free_x")+
+    stat_summary(fun.y="mean", shape=4, size=0.25, ### adds 'mean' dots to the boxplot, almost like a scatterplot
+              position=position_dodge(width=0.75), color="red")
+bp+theme_minimal()
+
+
+########################## PRINT BOXPLOTS boxes for each month FACET_WRAP ###########################################
+## Source of example: https://stackoverflow.com/questions/72662275/ggplot2-syntax-for-grouping-boxplots-by-month
+
+library(tidyverse) # or `library(ggplot2); library(dplyr)` or use base to add the year beforehand
+bp <- ggplot(ds1%>% 
+               mutate(year = lubridate::year(date)), 
+             month = lubridate::month(date, label = TRUE),
+             aes(x = date, y = DTW_m, 
+                 group = lubridate::floor_date(date, "month"),
+                 fill = as.factor(year), colour = as.factor(year))) +
+  geom_boxplot(alpha = 0.5,  outliers = FALSE) +
+  labs(x = "Date", y = "Water level depth (m)") +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b-%y")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  #facet_grid(.~serial_number)+
+  #facet_wrap(~year, nrow = 1, scales = "free_x")+
+  scale_y_reverse()+
+  geom_vline(xintercept = as.numeric(as.Date("2023-10-01")), linetype=4)+
+  geom_vline(xintercept = as.numeric(as.Date("2023-12-01")), linetype=4)+
+  # annotate("rect", xmin = as.Date("2023-10-01"),
+  #          xmax = as.Date("2023-12-01"), 
+  #          ymin = -2, ymax = inf,
+  #          alpha = 0.2)+
+  scale_colour_brewer(palette="Accent")+ 
+  scale_fill_brewer(palette="Paired")+
+  stat_summary(fun.y="mean", geom="point", size=0.5, ### adds 'mean' dots to the boxplot, almost like a scatterplot
+               position=position_dodge(width=0.75), color="red")
+bp+ theme_minimal()
+
+for (serial_number in unique(ds1$serial_number)) {
+  dev.new()
+  print( ggplot(ds1[ds1$serial_number==922303,], aes(Var1, Var2)) + geom_point() )
+}
+
+
+############# COMPARE each year
+# library(tidyverse); # or `library(ggplot2); library(dplyr)` or use base to add the year beforehand
+# ggplot(ds1 %>% mutate(year = lubridate::year(date)), 
+#        aes(x = date, y = DTW_m, 
+#            group = lubridate::floor_date(date, "month"))) +
+#   geom_boxplot(alpha = 0.5) +
+#   labs(x = "Collection Date", y = "PB(ug/L)") +
+#   scale_x_date(date_breaks = "1 month", date_labels =  "%b %Y") +
+#   theme(axis.text.x=element_text(angle=60, hjust=1)) +
+#   geom_hline(yintercept = 0, linetype=4)+
+#   facet_wrap(~year, nrow = 1, scales = "free_x")
+
+
+#### Compare different years (haven't added serial number as title to this one (yet))
+bp<-ggplot(ds2 %>% 
+             mutate(year = lubridate::year(date),
+                    month = lubridate::month(date, label = TRUE)), 
+           aes(x = as.factor(year), y = DTW_m, group = year,
+               fill = as.factor(year), colour = as.factor(year))) +
+  geom_boxplot(alpha = 0.5, outliers = FALSE) +
+  scale_y_reverse()+
+  geom_hline(yintercept = 0, linetype=2, alpha=0.3)+
+  scale_colour_brewer(palette="Accent")+ 
+  scale_fill_brewer(palette="Paired")+
+  #facet_wrap(~year, nrow = 1, scales = "free_x")+
+  labs(x = "Date", y = "Water level depth (m)") +
+  theme(axis.text.x=element_text(angle=60, hjust=1)) +
+  facet_wrap(~month, nrow = 1, scales = "free_x")+
+  stat_summary(fun.y="mean", shape=4, size=0.25, ### adds 'mean' dots to the boxplot, almost like a scatterplot
+               position=position_dodge(width=0.75), color="red")
+bp+theme_minimal()
+
